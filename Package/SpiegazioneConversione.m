@@ -1,7 +1,7 @@
 (* ::Package:: *)
 
-(* :Title: Tutorial *)
-(* :Context: Tutorial` *)
+(* :Title: SpiegazioneConversione  *)
+(* :Context: SpiegazioneConversione ` *)
 (* :Author: Matteo Rontini, Daniele Russo *)
 (* :Version: 1.6 *)
 (* :Date: 2025-05-09 *)
@@ -18,7 +18,7 @@ BeginPackage["SpiegazioneConversione`", {"Util`","Interaction`"}]
 (* Inizio del package Tutorial, specificando che importa anche il package Util` *)
 
 CreateExplainationConversion::usage = "CreateExplainationConversion[] inserisce il tutorial nel notebook corrente."
-(* Definisce la descrizione della built-in CreateTutorial *)
+(* Definisce la descrizione della built-in CreateExplanationConversion*)
 
 IntroSection::usage = "IntroSection[] crea l'intestazione e il sommario."
 (* Definisce la descrizione della built-in IntroSection *)
@@ -553,7 +553,7 @@ DecToBinSection[] := {
       Background -> Lighter[Gray, 0.95]
     ]
   };
-(* Fine della built-in DecToHexToDecSection *)
+(* Fine della built-in DecToHexSection *)
 
 
 
@@ -561,7 +561,7 @@ DecToBinSection[] := {
 (* Definizione della built-in principale che unisce tutte le sezioni *)
 
 CreateExplainationConversion[] := Module[{sezioni},
-(* Definizione della built-in CreateTutorial che non ha argomenti:
+(* Definizione della built-in CreateExplanationConversionche non ha argomenti:
    - Usa Module per definire variabili locali
    - La variabile locale qui \[EGrave] 'sezioni', che conterr\[AGrave] la lista di tutte le sezioni del tutorial
 *)
@@ -600,7 +600,7 @@ CreateExplainationConversion[] := Module[{sezioni},
      - Questo restituisce l'intero tutorial come un unico blocco visivo continuo
   *)
 ];
-(* Fine della built-in CreateTutorial *)
+(* Fine della built-in CreateExplanationConversion*)
 
 
 
