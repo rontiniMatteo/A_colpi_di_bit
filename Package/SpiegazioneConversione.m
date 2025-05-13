@@ -553,7 +553,7 @@ DecToBinSection[] := {
       Background -> Lighter[Gray, 0.95]
     ]
   };
-(* Fine della built-in DecToHexToDecSection *)
+(* Fine della built-in DecToHexSection *)
 
 
 
