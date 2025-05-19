@@ -1,213 +1,238 @@
+### Codice pulito
 (* ::Package:: *)
 
 (* :Title: Main *)
 (* :Context: Main` *)
-(* :Author: Daniele Russo, Nicola Modugno *)
+(* :Author: Daniele Russo, Nicola Modugno *)
 (* :Version: 3.4 *)
-(* :Date: 2025-05-06 *)
+(* :Date: 2025‑05‑06 *)
 
-(* :Summary: 
-   Questo pacchetto coordina le diverse fasi del gioco, dall'inizializzazione
-   alla battaglia, e gestisce l'interfaccia utente principale.
+(* :Summary:
+   Pacchetto principale che coordina le fasi del gioco, dall'inizializzazione
+   alla battaglia, e gestisce l’interfaccia utente.
 *)
 
-(* :Copyright: A colpi di Bit (C) 2025 *)
-(* :Keywords: battaglia navale, gioco, interfaccia *)
-(* :Requirements: Mathematica 12.0+, Util`, Battle`, Interaction` *)
+(* :Keywords: battaglia navale, UI, Dynamic refactoring *)
+(* :Requirements: Mathematica 12.0+, Util`, Battle`, Interaction` *)
 
-(* File: AcolpiDiBit.m *)
+BeginPackage["AcolpiDiBit`", {"Util`", "Battle`", "Interaction`"}];
 
-BeginPackage["AcolpiDiBit`", {"Util`", "Battle`", "Interaction`"}];  (* Apre il pacchetto Main e importa gli altri pacchetti richiesti *)
+placementUI::usage =
+  "placementUI[] visualizza l’interfaccia di posizionamento navi.";
 
-PlacementUI::usage = "PlacementUI[] interfaccia per il posizionamento navi";  (* Descrizione accessibile dell'interfaccia pubblica *)
+Begin["`Private`"];
 
-Begin["`Private`"];  (* Entra nella sezione Private, dove si definisce la logica interna del pacchetto *)
+(* ───────────────────────────────────────────────────────────── *)
+(*  FUNZIONE PUBBLICA                                           *)
+(* ───────────────────────────────────────────────────────────── *)
 
-PlacementUI[] := DynamicModule[  (* Definisce una DynamicModule per mantenere lo stato interattivo e aggiornato *)
-  
-  {  (* Inizio della lista delle variabili locali del modulo *)
+placementUI[] :=
+ DynamicModule[
+  {
+   seedValue        = ToString@RandomInteger[1024],
+   baseValue        = 2,
+   difficultyLevel  = 3,
+   phase            = 1,
+   initDone         = False,
+   message          = "",
+   cpuShips, battleStarted = False,
+   userShips, userGrid, cpuGrid,
+   difficultyLevels
+  },
 
-    seedValue = ToString[RandomInteger[1024]],        (* Genera un numero casuale da usare come seme per l'inizializzazione *)
-    baseValue = 2,                          (* Imposta come base numerica iniziale il binario (2) *)
-    difficultyLevel = 3,                    (* Livello di difficolt\[AGrave] predefinito (indice 3 nella lista dei livelli) *)
-    phase = 1,                              (* Fase del gioco attuale: 1=inserimento dati, 2=posizionamento navi, 3=battaglia *)
-    initDone = False,                       (* Flag per indicare se l'inizializzazione \[EGrave] stata completata con successo *)
-    message = "",                           (* Stringa per mostrare messaggi informativi o di errore *)
-    cpuShips,                               (* Variabile per contenere le navi generate per il computer *)
-    battleStarted = False,                  (* Flag che indica se la fase di battaglia \[EGrave] cominciata *)
-    userShips,                              (* Variabile per contenere le navi inserite dall'utente *)
-    userGrid,                               (* La griglia attuale dell'utente *)
-    cpuGrid,                                (* La griglia attuale del computer *)
-    difficultyLevels                        (* Conterr\[AGrave] i livelli di difficolt\[AGrave] disponibili *)
+  difficultyLevels = getDifficultyLevels[];
+  setSeed[ToExpression@seedValue];
 
-  },  (* Fine lista variabili *)
+  Style[
+   Column[{
+     Dynamic[renderPhase[]]      (* Dynamic “corto”: chiama una sola funzione *)
+   }],
+   FontFamily -> "Arial"
+  ]
+];
 
-  difficultyLevels = GetDifficultyLevels[];  (* Ottiene l'elenco dei livelli di difficolt\[AGrave] dal pacchetto Interaction *)
-  SetSeed[ToExpression[seedValue]];
+(* ───────────────────────────────────────────────────────────── *)
+(*  DISPATCHER DINAMICO (chiamato dall’unico Dynamic “corto”)   *)
+(* ───────────────────────────────────────────────────────────── *)
 
-  Column[{  (* La struttura principale \[EGrave] una colonna verticale di elementi *)
+renderPhase[] :=
+ Switch[phase,
+  1, phaseOneUI[],
+  2, phaseTwoUI[],
+  3, phaseThreeUI[],
+  _, Style["Fase sconosciuta", Red]
+ ];
 
-    Dynamic[Which[  (* Dynamic aggiorna l'interfaccia quando cambiano variabili; Which seleziona il blocco attivo *)
+(* ───────────────────────────────────────────────────────────── *)
+(*  FASI DELL’INTERFACCIA                                      *)
+(* ───────────────────────────────────────────────────────────── *)
 
-      phase == 1,  (* Se siamo nella fase 1: configurazione iniziale *)
-      
-      Column[{  (* Crea una colonna di elementi per l'interfaccia di configurazione *)
+phaseOneUI[] :=
+ Column[{
+   askSeedInput[Function[input, seedValue = input]],
+   Spacer[10],
+   askBaseChoice[Function[input, baseValue = input]],
+   Spacer[10],
+   Row[{
+     "Livello di difficoltà: ",
+     PopupMenu[
+      Dynamic[difficultyLevel],
+      Table[i -> difficultyLevels[[i, 1]], {i, Length@difficultyLevels}]
+     ]
+   }],
+   Spacer[10],
+   Button["Conferma Impostazioni", confirmInitProcess[]],
+   Spacer[10],
+   messageDisplayDyn[]
+ }];
 
-        AskSeedInput[Function[input, seedValue = input]],  (* Campo per inserire il seed, aggiorna seedValue *)
+phaseTwoUI[] :=
+ Column[{
+   placementDM[],
+   Button["Reset Game", phase = 1;]
+ }];
 
-        Spacer[10],  (* Aggiunge spazio verticale di 10 punti *)
+phaseThreeUI[] :=
+ Column[{
+   Style["Battaglia Navale in Base " <> ToString@baseValue, Bold, 20, Red],
+   Spacer[10],
+   battleStartDyn[],
+   Spacer[10],
+   Button["Reset Game", resetGame[]; phase = 1;]
+ }];
 
-        AskBaseChoice[Function[input, baseValue = input]],  (* Scelta della base numerica, aggiorna baseValue *)
+(* ───────────────────────────────────────────────────────────── *)
+(*  FASE 1 – logica                                             *)
+(* ───────────────────────────────────────────────────────────── *)
 
-        Spacer[10],  (* Altro spazio verticale *)
+confirmInitProcess[] :=
+ If[
+  isSeed@seedValue && isBase@baseValue,
+  message = "";
+  If[initPhase[ToExpression@seedValue, baseValue, difficultyLevel],
+   phase = 2; initDone = True,
+   message = "Errore durante l’inizializzazione. Riprova."
+  ],
+  message = "Seed non valido!\nInserisci un numero intero decimale."
+ ];
 
-        Row[{  (* Riga con etichetta e menu a tendina per la difficolt\[AGrave] *)
-          "Livello di difficolt\[AGrave]: ",
-          PopupMenu[  (* Menu a tendina per scegliere la difficolt\[AGrave] *)
-            Dynamic[difficultyLevel],  (* Selezione dinamica collegata a difficultyLevel *)
-            Table[i -> difficultyLevels[[i, 1]], {i, Length[difficultyLevels]}]  (* Popola il menu con i nomi dei livelli *)
-          ]
+(* ───────────────────────────────────────────────────────────── *)
+(*  FASE 2 – DynamicModule compatto                             *)
+(* ───────────────────────────────────────────────────────────── *)
+
+placementDM[] :=
+ DynamicModule[
+  {
+   currentShip      = 1, start = "", end = "",
+   shipPlacementMsg = "", placementDone = False,
+   gridSize         = getGridSize[]
+  },
+
+  Column[{
+    Style["Fase di Posizionamento Navi", Bold, 16],
+    Style[
+     "Livello: " <> difficultyLevels[[difficultyLevel, 1]] <>
+      "  •  Griglia " <> ToString@gridSize <> " × " <> ToString@gridSize,
+     Italic
+    ],
+
+    Row[{
+      (* ── Colonna sinistra ── *)
+      Column[{
+        currentShipRowDyn[],
+        Grid[{
+          {"Inizio:", InputField[Dynamic[start], String,
+             Enabled -> Dynamic[! placementDone]]},
+          {"Fine:",   InputField[Dynamic[end],   String,
+             Enabled -> Dynamic[! placementDone]]},
+
+          {"",
+           Button["Conferma", confirmPlacementProcess[],
+            Enabled -> Dynamic[! placementDone]]
+          },
+
+          {"",
+           Button["Avvia Battaglia",
+            (
+             userShips = getUserShips[];
+             userGrid  = getUserGrid[];
+             phase     = 3;
+            ),
+            Enabled -> Dynamic[placementDone]]
+          },
+
+          {"",
+           Row[{helpUser@baseValue, Spacer[30], helpUserPersonalized@baseValue}]
+          }
         }],
+        placementMsgDyn[]
+      }],
 
-        Spacer[10],  (* Aggiunge spazio verticale *)
+      Spacer[30],
 
-        Button["Conferma Impostazioni",(* Bottone per confermare le impostazioni iniziali *)
-          If[isSeed[seedValue] && isBase[baseValue], message="";(* Controlla che il seed e la base siano validi *)
-            If[InitPhase[ToExpression[seedValue], baseValue, difficultyLevel],  (* Inizializza la fase, se va a buon fine... *)
-              phase = 2;  (* Passa alla fase 2: posizionamento navi *)
-              initDone = True;,  (* Segna che l'inizializzazione \[EGrave] avvenuta *)
-              message = "Errore durante l'inizializzazione. Riprova.";  (* Altrimenti mostra errore *)
-            ],
-            message = "Seed (Intero non negativo) o base (2,8,16) non validi!";  (* Messaggio se input non valido *)
-          ]
-        ],
+      (* ── Colonna destra ── *)
+      Column[{
+        Style["La tua flotta", Bold, 14],
+        gridPreviewDyn[],
+        Style["Navi da posizionare:", Bold, 12],
+        remainingShipsDyn[]
+      }]
+    }]
+  }]
+ ];
 
-        Spacer[10],  (* Spazio verticale *)
+confirmPlacementProcess[] :=
+ Module[{result = placeUserShip[start, end]},
+  If[result[[1]],
+   start = ""; end = "";
+   If[Length@getRemainingShipLengths[] == 0,
+    placementDone     = True;
+    shipPlacementMsg  = "Tutte le navi sono state posizionate!",
+    currentShip++; shipPlacementMsg = result[[2]]
+   ],
+   shipPlacementMsg   = result[[2]]
+  ]
+ ];
 
-        Dynamic[message]  (* Mostra messaggi dinamicamente in base alla variabile message *)
+(* ───────────────────────────────────────────────────────────── *)
+(*  FASE 3 – Dynamic compatto                                   *)
+(* ───────────────────────────────────────────────────────────── *)
 
-      }],  (* Fine colonna fase 1 *)
+startBattleRender[] :=
+ startGame[
+  getUserShips[],
+  getCpuShip[],
+  getUserGrid[],
+  getCpuGrid[],
+  baseValue,
+  getGridSize[]
+ ];
 
-      phase == 2,  (* Se siamo nella fase 2: posizionamento delle navi *)
+battleStartDyn[] := Dynamic[startBattleRender[]];
 
-      Column[{  (* Colonna per la UI della fase 2 *)
+(* ───────────────────────────────────────────────────────────── *)
+(*  DYNAMIC “CORTI”                                             *)
+(* ───────────────────────────────────────────────────────────── *)
 
-        DynamicModule[{  (* Modulo interno per la fase di posizionamento *)
-          currentShip = 1, start = "", end = "",  (* Stato della nave corrente e input coordinate *)
-          shipPlacementMsg = "", placementDone = False,  (* Messaggi e stato del posizionamento *)
-          gridSize = GetGridSize[]  (* Dimensione della griglia presa dalla costante globale *)
-        },
+displayMessage[msg_] := Style[msg, Red];
+messageDisplayDyn[]  := Dynamic[displayMessage@message];
 
-        Column[{  (* Colonna di layout della fase 2 *)
+currentShipLabel[i_] := Row[{"Nave ", i, ":"}];
+currentShipRowDyn[]  := Dynamic[currentShipLabel@currentShip];
 
-          Style["Fase di Posizionamento Navi", Bold, 16],  (* Titolo con stile *)
+gridPreview[] :=
+ Util`showGrid[getUserGrid[], True];
+gridPreviewDyn[] := Dynamic[gridPreview[]];
 
-          Style[  (* Riga informativa su difficolt\[AGrave] e dimensione griglia *)
-            "Livello di difficolt\[AGrave]: " <> difficultyLevels[[difficultyLevel, 1]] <>
-            " - Griglia " <> ToString[gridSize] <> "\[Times]" <> ToString[gridSize], Italic
-          ],
+remainingShipsCalc[] :=
+ Module[{r = getRemainingShipLengths[]},
+  If[Length@r > 0,
+   "Lunghezze rimanenti: " <> ToString@r,
+   "Tutte le navi sono state posizionate!"
+  ]
+ ];
+remainingShipsDyn[] := Dynamic[remainingShipsCalc[]];
 
-          Row[{  (* Riga contenente input e griglia *)
-
-            Column[{  (* Colonna sinistra con controlli utente *)
-
-              Dynamic[Row[{"Nave ", currentShip, ":"}]],  (* Indica la nave che si sta posizionando *)
-
-              Grid[{  (* Griglia per input coordinate e pulsanti *)
-
-                {"Inizio:", InputField[Dynamic[start], String, Enabled -> Dynamic[!placementDone]]},
-                {"Fine:", InputField[Dynamic[end], String, Enabled -> Dynamic[!placementDone]]},
-
-                {"", Button["Conferma",  (* Bottone per posizionare la nave *)
-                  Module[{result = PlaceUserShip[start, end]},  (* Chiama la funzione che tenta il posizionamento *)
-                    If[result[[1]],  (* Se il posizionamento ha successo... *)
-                      start = ""; end = "";  (* Pulisce gli input *)
-
-                      If[Length[GetRemainingShipLengths[]] == 0,  (* Controlla se restano navi da posizionare *)
-                        placementDone = True;  (* Flag: tutte le navi piazzate *)
-                        shipPlacementMsg = "Tutte le navi sono state posizionate!";,
-                        currentShip++;  (* Altrimenti passa alla successiva *)
-                        shipPlacementMsg = result[[2]];
-                      ],
-                      shipPlacementMsg = result[[2]];  (* Messaggio di errore *)
-                    ]
-                  ],
-                  Enabled -> Dynamic[!placementDone]
-                ]},
-
-                {"", Button["Avvia Battaglia",  (* Bottone per iniziare la battaglia *)
-                  userShips = GetUserShips[];  (* Recupera le navi utente *)
-                  userGrid = GetUserGrid[];  (* Recupera la griglia utente *)
-                  phase = 3;,  (* Passa alla fase 3 *)
-                  Enabled -> Dynamic[placementDone]
-                ]},
-
-                {"", Row[{  (* Pulsanti di aiuto per la base selezionata *)
-                  helpUser[baseValue],
-                  Spacer[30],
-                  helpUserPersonalized[baseValue]
-                }]}
-              }],
-
-              Dynamic[Style[  (* Messaggi dinamici per feedback del posizionamento *)
-                shipPlacementMsg,
-                If[StringMatchQ[shipPlacementMsg, "Nave piazzata*" | "Tutte le navi*"], Darker[Green], Red]
-              ]]
-
-            }],  (* Fine colonna sinistra *)
-
-            Spacer[30],  (* Spazio orizzontale tra input e griglia *)
-
-            Column[{  (* Colonna destra con visualizzazione griglia *)
-
-              Style["La tua flotta", Bold, 14],
-              Dynamic[Util`showGrid[GetUserGrid[], True]],
-
-              Style["Navi da posizionare:", Bold, 12],
-              Dynamic[Module[{remaining = GetRemainingShipLengths[]},
-                If[Length[remaining] > 0,
-                  "Lunghezze rimanenti: " <> ToString[remaining],
-                  "Tutte le navi sono state posizionate!"
-                ]
-              ]]
-
-            }]  (* Fine colonna destra *)
-
-          }]  (* Fine Row della fase 2 *)
-
-        }]  (* Fine colonna della fase 2 *)
-
-        ],  (* Fine DynamicModule posizionamento navi *)
-
-        Button["Reset Game", phase = 1;]  (* Pulsante per ricominciare da capo *)
-
-      }],  (* Fine colonna fase 2 *)
-
-      phase == 3,  (* Se siamo nella fase 3: battaglia *)
-
-      Column[{  (* Interfaccia della battaglia *)
-
-        Style["Battaglia Navale in Base " <> ToString[baseValue], Bold, 20, Red],
-        Spacer[10],
-        Dynamic[StartGame[  (* Inizia la battaglia vera e propria con le griglie e navi *)
-          GetUserShips[],
-          GetCpuShip[],
-          GetUserGrid[],
-          GetCpuGrid[],
-          baseValue,
-          GetGridSize[]
-        ]],
-        Spacer[10],
-        Button["Reset Game", ResetGame[]; phase = 1;]  (* Pulsante per ricominciare *)
-
-      }]  (* Fine colonna fase 3 *)
-
-    ]]  (* Fine Dynamic[Which[...] ] *)
-
-  }]  (* Fine Column principale *)
-
-];  (* Fine funzione PlacementUI *)
-
-End[];  (* Chiude il contesto privato *)
-EndPackage[];  (* Chiude il pacchetto Main *)
-
+(* ───────────────────────────────────────────────────────────── *)
+End[];
+EndPackage[];
